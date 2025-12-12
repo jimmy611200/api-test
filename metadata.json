@@ -1,0 +1,5 @@
+{
+  "name": "OA API物件系統",
+  "description": "Configuration interface for connecting Pro OA forms to external APIs like FlexSystem.",
+  "requestFramePermissions": []
+}
