@@ -1,20 +1,25 @@
 
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { DataSource, ApiObject } from './types';
-import { INITIAL_DATA_SOURCES, INITIAL_API_OBJECTS } from './constants';
+import { DataSource, ApiObject, ApiCategory } from './types';
+import { INITIAL_DATA_SOURCES, INITIAL_API_OBJECTS, INITIAL_CATEGORIES } from './constants';
 import { ConnectionConfig } from './components/ConnectionConfig';
 import { ApiObjectEditor } from './components/ApiObjectEditor';
 import { FormDesigner } from './components/FormDesigner';
+import { CategoryManager } from './components/CategoryManager';
 import { 
-  Layout, 
   Plus, 
   Save, 
   Database,
   Layers,
   ChevronRight,
   Server,
-  FileEdit
+  FileEdit,
+  Settings,
+  Box,
+  Command,
+  LayoutGrid,
+  Zap
 } from 'lucide-react';
 
 type ViewMode = 'sources' | 'objects' | 'designer';
@@ -22,9 +27,13 @@ type ViewMode = 'sources' | 'objects' | 'designer';
 const App: React.FC = () => {
   const [dataSources, setDataSources] = useState<DataSource[]>(INITIAL_DATA_SOURCES);
   const [apiObjects, setApiObjects] = useState<ApiObject[]>(INITIAL_API_OBJECTS);
+  const [categories, setCategories] = useState<ApiCategory[]>(INITIAL_CATEGORIES);
   
   const [viewMode, setViewMode] = useState<ViewMode>('sources');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   // Initialize selection
   React.useEffect(() => {
@@ -36,6 +45,13 @@ const App: React.FC = () => {
         // Create new if empty list
         if (viewMode === 'sources') addDataSource();
         if (viewMode === 'objects') addApiObject();
+    }
+    
+    // Default expand all categories
+    if (viewMode === 'objects') {
+        const initExpanded: Record<string, boolean> = { 'uncategorized': true };
+        categories.forEach(c => initExpanded[c.id] = true);
+        setExpandedCategories(initExpanded);
     }
   }, [viewMode]);
 
@@ -86,120 +102,255 @@ const App: React.FC = () => {
         if (selectedId === id) setSelectedId(null);
     }
   };
+  
+  const toggleCategory = (id: string) => {
+      setExpandedCategories(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Group API Objects by Category
+  const groupedObjects = React.useMemo(() => {
+      const groups: Record<string, ApiObject[]> = {};
+      
+      // Initialize groups for existing categories
+      categories.forEach(c => { groups[c.id] = []; });
+      groups['uncategorized'] = [];
+
+      apiObjects.forEach(obj => {
+          if (obj.categoryId && groups[obj.categoryId]) {
+              groups[obj.categoryId].push(obj);
+          } else {
+              groups['uncategorized'].push(obj);
+          }
+      });
+      return groups;
+  }, [apiObjects, categories]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-100 text-slate-800 font-sans">
-      {/* Sidebar */}
-      <div className="w-72 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 shadow-xl z-20">
-        <div className="p-5 border-b border-slate-800 flex items-center gap-3 text-white">
-            <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-900/50">
-                <Layout size={20} className="text-white" />
+    <div className="flex h-screen overflow-hidden bg-slate-50 text-slate-800 font-sans selection:bg-sky-100 selection:text-sky-900">
+      {/* Sidebar - Clean White Theme */}
+      <div className="w-72 bg-white flex flex-col border-r border-slate-200 z-20 shadow-[4px_0_24px_-12px_rgba(0,0,0,0.1)]">
+        <div className="p-6 flex items-center gap-3 shrink-0">
+            <div className="bg-gradient-to-br from-sky-400 to-blue-600 p-2 rounded-xl text-white shadow-lg shadow-sky-200">
+                <Zap size={20} fill="currentColor" />
             </div>
-            <span className="font-bold text-lg tracking-tight">Pro OA 設定</span>
+            <div>
+                <h1 className="font-bold text-lg text-slate-900 tracking-tight leading-none">Pro OA</h1>
+                <span className="text-[10px] font-bold text-sky-500 uppercase tracking-widest">Connect Hub</span>
+            </div>
         </div>
         
-        {/* Navigation */}
-        <div className="flex p-3 gap-2 border-b border-slate-800 pb-4">
+        {/* Navigation Tabs */}
+        <div className="flex px-4 gap-2 shrink-0 mb-4">
             <button 
                 onClick={() => { setViewMode('sources'); setSelectedId(null); }}
-                className={`flex-1 py-2 px-3 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${viewMode === 'sources' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 text-slate-500'}`}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all relative overflow-hidden ${
+                    viewMode === 'sources' 
+                    ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 shadow-sm' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
             >
                 資料來源
+                {viewMode === 'sources' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-sky-500 rounded-t-full"></div>}
             </button>
             <button 
                 onClick={() => { setViewMode('objects'); setSelectedId(null); }}
-                className={`flex-1 py-2 px-3 rounded-md text-xs font-bold uppercase tracking-wide transition-all ${viewMode === 'objects' ? 'bg-slate-800 text-white shadow-inner' : 'hover:bg-slate-800/50 text-slate-500'}`}
+                className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all relative overflow-hidden ${
+                    viewMode === 'objects' 
+                    ? 'bg-sky-50 text-sky-700 ring-1 ring-sky-200 shadow-sm' 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
+                }`}
             >
                 API 物件
+                {viewMode === 'objects' && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-sky-500 rounded-t-full"></div>}
             </button>
         </div>
 
-        {/* Extended Nav for Designer */}
-        <div className="px-3 pt-2">
+        {/* Scrollable List Content */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col px-4 pb-4">
+            
+            {/* List Toolbar / Header */}
+            {viewMode !== 'designer' && (
+                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur py-2 mb-2 flex items-center justify-between shrink-0 border-b border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                        {viewMode === 'sources' ? 'Connections' : 'Library'}
+                    </span>
+                    
+                    <div className="flex items-center gap-1">
+                        {viewMode === 'objects' && (
+                             <button 
+                                onClick={() => setShowCategoryManager(true)}
+                                className="p-1.5 hover:bg-slate-100 rounded-md text-slate-400 hover:text-sky-600 transition-colors"
+                                title="管理分類"
+                            >
+                                <Settings size={14} />
+                            </button>
+                        )}
+                        <button 
+                            onClick={viewMode === 'sources' ? addDataSource : addApiObject}
+                            className="p-1.5 hover:bg-sky-50 rounded-md text-slate-400 hover:text-sky-600 transition-all"
+                            title={viewMode === 'sources' ? "新增資料來源" : "新增 API 物件"}
+                        >
+                            <Plus size={16} strokeWidth={2.5} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            <div className="space-y-1.5">
+                {/* MODE: Data Sources */}
+                {viewMode === 'sources' && (
+                    dataSources.map(ds => (
+                        <button
+                            key={ds.id}
+                            onClick={() => setSelectedId(ds.id)}
+                            className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-all flex items-center gap-3 group border ${
+                                selectedId === ds.id 
+                                ? 'bg-sky-50 border-sky-200 text-sky-900 shadow-sm' 
+                                : 'border-transparent hover:bg-slate-50 text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                            <div className={`p-2 rounded-lg transition-colors ${selectedId === ds.id ? 'bg-white text-sky-500 shadow-sm' : 'bg-slate-100 text-slate-400 group-hover:bg-white group-hover:text-sky-500'}`}>
+                                <Server size={18} />
+                            </div>
+                            <span className="truncate font-medium">{ds.name}</span>
+                        </button>
+                    ))
+                )}
+
+                {/* MODE: API Objects (Categorized) */}
+                {viewMode === 'objects' && (
+                    <div className="space-y-4 pt-1">
+                        {/* Categories Loop */}
+                        {categories.map(cat => {
+                            const count = groupedObjects[cat.id]?.length || 0;
+                            const isExpanded = expandedCategories[cat.id];
+                            
+                            return (
+                                <div key={cat.id} className="select-none">
+                                    <button 
+                                        onClick={() => toggleCategory(cat.id)}
+                                        className="w-full flex items-center justify-between text-xs font-bold text-slate-500 hover:text-sky-700 px-1 py-1 mb-1 transition-colors group"
+                                    >
+                                        <div className="flex items-center gap-1.5">
+                                            <div className={`p-0.5 rounded transition-colors ${isExpanded ? 'bg-sky-100 text-sky-600' : 'text-slate-400'}`}>
+                                                <ChevronRight size={12} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                                            </div>
+                                            <span className="uppercase tracking-wide flex items-center gap-1.5">
+                                                {cat.name}
+                                            </span>
+                                        </div>
+                                        {count > 0 && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded-md font-medium">{count}</span>}
+                                    </button>
+                                    
+                                    {isExpanded && (
+                                        <div className="space-y-1 relative ml-1.5 pl-2 border-l border-slate-100">
+                                            {groupedObjects[cat.id]?.length === 0 ? (
+                                                <div className="px-3 py-2 text-xs text-slate-400 italic flex items-center gap-2">
+                                                    <Box size={12} /> 無物件
+                                                </div>
+                                            ) : (
+                                                groupedObjects[cat.id].map(obj => (
+                                                    <button
+                                                        key={obj.id}
+                                                        onClick={() => setSelectedId(obj.id)}
+                                                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center gap-2.5 group border ${
+                                                            selectedId === obj.id 
+                                                            ? 'bg-white border-sky-200 text-sky-700 shadow-sm' 
+                                                            : 'border-transparent hover:bg-slate-50 text-slate-500 hover:text-slate-700'
+                                                        }`}
+                                                    >
+                                                        <Layers size={14} className={`shrink-0 ${selectedId === obj.id ? 'text-sky-500' : 'text-slate-400 group-hover:text-sky-400'}`} />
+                                                        <span className="truncate font-medium">{obj.name}</span>
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                        
+                        {/* Uncategorized */}
+                        <div className="select-none">
+                             <button 
+                                onClick={() => toggleCategory('uncategorized')}
+                                className="w-full flex items-center justify-between text-xs font-bold text-slate-500 hover:text-sky-700 px-1 py-1 mb-1 transition-colors group"
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <div className={`p-0.5 rounded transition-colors ${expandedCategories['uncategorized'] ? 'bg-sky-100 text-sky-600' : 'text-slate-400'}`}>
+                                        <ChevronRight size={12} className={`transition-transform duration-200 ${expandedCategories['uncategorized'] ? 'rotate-90' : ''}`} />
+                                    </div>
+                                    <span className="uppercase tracking-wide flex items-center gap-1.5">
+                                         未分類
+                                    </span>
+                                </div>
+                                {groupedObjects['uncategorized']?.length > 0 && (
+                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 rounded-md font-medium">{groupedObjects['uncategorized']?.length}</span>
+                                )}
+                            </button>
+                             {expandedCategories['uncategorized'] && (
+                                 <div className="space-y-1 relative ml-1.5 pl-2 border-l border-slate-100">
+                                    {groupedObjects['uncategorized']?.length === 0 ? (
+                                         <div className="px-3 py-2 text-xs text-slate-400 italic flex items-center gap-2">
+                                            <Box size={12} /> 無物件
+                                        </div>
+                                    ) : (
+                                        groupedObjects['uncategorized'].map(obj => (
+                                            <button
+                                                key={obj.id}
+                                                onClick={() => setSelectedId(obj.id)}
+                                                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all flex items-center gap-2.5 group border ${
+                                                    selectedId === obj.id 
+                                                    ? 'bg-white border-sky-200 text-sky-700 shadow-sm' 
+                                                    : 'border-transparent hover:bg-slate-50 text-slate-500 hover:text-slate-700'
+                                                }`}
+                                            >
+                                                <Layers size={14} className={`shrink-0 ${selectedId === obj.id ? 'text-sky-500' : 'text-slate-400 group-hover:text-sky-400'}`} />
+                                                <span className="truncate font-medium">{obj.name}</span>
+                                            </button>
+                                        ))
+                                    )}
+                                 </div>
+                             )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+
+        {/* Footer with Designer Link */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50">
              <button 
                 onClick={() => { setViewMode('designer'); setSelectedId(null); }}
-                className={`w-full py-2.5 px-3 rounded-md text-sm font-bold flex items-center gap-3 transition-all ${viewMode === 'designer' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/50' : 'hover:bg-slate-800/50 text-slate-400'}`}
+                className={`w-full py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
+                    viewMode === 'designer' 
+                    ? 'bg-sky-500 text-white shadow-sky-200 ring-2 ring-sky-100' 
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-sky-300 hover:text-sky-600'
+                }`}
             >
-                <FileEdit size={18} />
+                <FileEdit size={16} />
                 表單設計 (Designer)
             </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-            {viewMode !== 'designer' && (
-                <div className="flex justify-between items-center px-2 mb-2">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                        {viewMode === 'sources' ? 'Connections' : 'Endpoints'}
-                    </span>
-                    <button 
-                        onClick={viewMode === 'sources' ? addDataSource : addApiObject}
-                        className="p-1 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white transition-colors"
-                    >
-                        <Plus size={14} />
-                    </button>
-                </div>
-            )}
-
-            {viewMode === 'sources' && (
-                dataSources.map(ds => (
-                    <button
-                        key={ds.id}
-                        onClick={() => setSelectedId(ds.id)}
-                        className={`w-full text-left px-3 py-3 rounded-lg text-sm transition-all flex items-center gap-3 group relative ${selectedId === ds.id ? 'bg-slate-800 text-white shadow-md border-l-4 border-indigo-500' : 'hover:bg-slate-800/50'}`}
-                    >
-                        <Server size={16} className={selectedId === ds.id ? 'text-indigo-400' : 'text-slate-600 group-hover:text-slate-400'} />
-                        <span className="truncate font-medium">{ds.name}</span>
-                    </button>
-                ))
-            )}
-
-            {viewMode === 'objects' && (
-                apiObjects.map(obj => (
-                    <button
-                        key={obj.id}
-                        onClick={() => setSelectedId(obj.id)}
-                        className={`w-full text-left px-3 py-3 rounded-lg text-sm transition-all flex items-center gap-3 group relative ${selectedId === obj.id ? 'bg-slate-800 text-white shadow-md border-l-4 border-emerald-500' : 'hover:bg-slate-800/50'}`}
-                    >
-                        <Layers size={16} className={selectedId === obj.id ? 'text-emerald-400' : 'text-slate-600 group-hover:text-slate-400'} />
-                        <span className="truncate font-medium">{obj.name}</span>
-                    </button>
-                ))
-            )}
-            
-            {viewMode === 'designer' && (
-                <div className="p-4 text-xs text-slate-500 leading-relaxed bg-slate-800/30 rounded-lg border border-slate-800 m-2">
-                    <p className="mb-2 text-indigo-400 font-bold">小提示：</p>
-                    <ul className="list-disc list-inside space-y-1">
-                        <li>點擊左側工具箱的元件以新增。</li>
-                        <li>點擊畫布上的欄位進行編輯。</li>
-                        <li>右側面板可設定詳細屬性。</li>
-                    </ul>
-                </div>
-            )}
-        </div>
-        
-        <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-            v2.5.0 Pro Form
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative bg-slate-50/50">
         {viewMode === 'designer' ? (
             <FormDesigner apiObjects={apiObjects} />
         ) : (
             <>
-                {/* Top Bar (Only for Config Views) */}
-                <header className="bg-white border-b border-slate-200 h-16 px-8 flex items-center justify-between shadow-sm z-10">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${viewMode === 'sources' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                {/* Top Bar */}
+                <header className="bg-white/80 backdrop-blur border-b border-slate-200 h-16 px-8 flex items-center justify-between shrink-0 z-10 sticky top-0">
+                    <div className="flex items-center gap-4">
+                        <div className={`p-2.5 rounded-xl ${viewMode === 'sources' ? 'bg-sky-50 text-sky-600' : 'bg-blue-50 text-blue-600'}`}>
                             {viewMode === 'sources' ? <Database size={20} /> : <Layers size={20} />}
                         </div>
                         <div>
-                            <h1 className="text-lg font-bold text-slate-800">
+                            <h1 className="text-xl font-bold text-slate-800 tracking-tight">
                                 {viewMode === 'sources' ? activeSource?.name || '未選擇' : activeObject?.name || '未選擇'}
                             </h1>
-                            <p className="text-xs text-slate-500 font-medium">
+                            <p className="text-xs text-slate-500 font-medium mt-0.5">
                                 {viewMode === 'sources' 
                                     ? '外部資料來源連線設定' 
                                     : `所屬來源: ${dataSources.find(d => d.id === activeObject?.dataSourceId)?.name || '未指定'}`
@@ -207,25 +358,28 @@ const App: React.FC = () => {
                             </p>
                         </div>
                     </div>
-                    <button className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-lg hover:bg-slate-800 shadow-md transition-all text-sm font-medium">
-                        <Save size={18} /> 儲存變更
+                    <button className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl hover:bg-slate-800 shadow-lg shadow-slate-200 transition-all text-sm font-bold tracking-wide active:scale-95">
+                        <Save size={16} /> 儲存變更
                     </button>
                 </header>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-auto bg-slate-50/50 p-8">
-                    <div className="max-w-5xl mx-auto h-full">
+                <div className="flex-1 overflow-hidden flex flex-col p-8">
+                    <div className="max-w-5xl mx-auto h-full w-full flex-1">
                         {viewMode === 'sources' && activeSource && (
-                            <ConnectionConfig 
-                                dataSource={activeSource}
-                                onChange={updateDataSource}
-                            />
+                            <div className="h-full overflow-y-auto custom-scrollbar pr-2">
+                                <ConnectionConfig 
+                                    dataSource={activeSource}
+                                    onChange={updateDataSource}
+                                />
+                            </div>
                         )}
 
                         {viewMode === 'objects' && activeObject && (
                             <ApiObjectEditor
                                 apiObject={activeObject}
                                 dataSources={dataSources}
+                                categories={categories}
                                 onChange={updateApiObject}
                                 onDelete={() => deleteApiObject(activeObject.id)}
                             />
@@ -233,11 +387,11 @@ const App: React.FC = () => {
 
                         {((viewMode === 'sources' && !activeSource) || (viewMode === 'objects' && !activeObject)) && (
                             <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                                    {viewMode === 'sources' ? <Server size={32} /> : <Layers size={32} />}
+                                <div className="w-24 h-24 bg-white border border-slate-100 shadow-sm rounded-full flex items-center justify-center mb-6">
+                                    <LayoutGrid size={40} className="text-slate-300" />
                                 </div>
-                                <p className="text-lg font-medium text-slate-600">請從左側選擇項目進行編輯</p>
-                                <p className="text-sm mt-2">或點擊「+」新增項目</p>
+                                <p className="text-xl font-bold text-slate-700">請從左側選擇項目進行編輯</p>
+                                <p className="text-sm mt-2 font-medium">或點擊左側「+」新增項目</p>
                             </div>
                         )}
                     </div>
@@ -245,6 +399,15 @@ const App: React.FC = () => {
             </>
         )}
       </div>
+
+      {/* Category Manager Modal */}
+      {showCategoryManager && (
+          <CategoryManager 
+            categories={categories} 
+            onChange={setCategories} 
+            onClose={() => setShowCategoryManager(false)} 
+          />
+      )}
     </div>
   );
 };

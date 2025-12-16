@@ -4,7 +4,7 @@ import { FormElement, FormElementType, FormElementOption, ApiObject, ApiBinding 
 import { 
   Type, Hash, Calendar, List, CheckSquare, CircleDot, 
   AlignLeft, Settings2, Trash2, GripVertical, Plus, X, Copy,
-  MousePointer2, Square, Link2, Info
+  MousePointer2, Square, Link2, Info, Plug, BoxSelect
 } from 'lucide-react';
 
 interface Props {
@@ -132,22 +132,22 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
     });
   };
 
-  // Style constants
-  const inputClass = "w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm transition-all";
-  const labelClass = "block text-xs font-bold text-slate-500 uppercase mb-1.5 tracking-wide";
+  // Modern Styles
+  const inputClass = "w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 shadow-sm transition-all";
+  const labelClass = "block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide";
 
   // Helper to check if element supports binding
   const isListType = (type: FormElementType) => ['select', 'radio', 'checkbox'].includes(type);
   const isValueType = (type: FormElementType) => ['text', 'number', 'date', 'textarea'].includes(type);
 
   return (
-    <div className="flex h-full bg-slate-100 overflow-hidden">
+    <div className="flex h-full bg-slate-50 overflow-hidden">
         
         {/* Left: Toolbox */}
         <div className="w-64 bg-white border-r border-slate-200 flex flex-col z-10 shadow-sm">
             <div className="p-4 border-b border-slate-100">
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <MousePointer2 size={16} className="text-indigo-600" />
+                    <BoxSelect size={16} className="text-sky-600" />
                     元件工具箱
                 </h3>
             </div>
@@ -157,120 +157,141 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                         <button
                             key={type}
                             onClick={() => addElement(type)}
-                            className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 hover:shadow-md transition-all group"
+                            className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl border border-slate-200 bg-white hover:bg-sky-50 hover:border-sky-200 hover:text-sky-700 hover:shadow-md transition-all group"
                         >
-                            <div className="text-slate-500 group-hover:text-indigo-600 transition-colors">
+                            <div className="text-slate-400 group-hover:text-sky-600 transition-colors">
                                 {getIcon(type, 20)}
                             </div>
-                            <span className="text-xs font-medium text-slate-600 group-hover:text-indigo-700">{getDefaultLabel(type)}</span>
+                            <span className="text-xs font-bold text-slate-600 group-hover:text-sky-700">{getDefaultLabel(type)}</span>
                         </button>
                     ))}
                 </div>
             </div>
-            <div className="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-400 text-center">
+            <div className="p-4 bg-slate-50 border-t border-slate-200 text-xs text-slate-400 text-center font-medium">
                 點擊上方元件加入表單
             </div>
         </div>
 
-        {/* Center: Canvas */}
-        <div className="flex-1 bg-slate-100 p-8 overflow-y-auto flex flex-col items-center" onClick={() => setSelectedId(null)}>
-            <div className="w-full max-w-2xl bg-white min-h-[calc(100vh-8rem)] rounded-xl shadow-sm border border-slate-200 flex flex-col relative" onClick={(e) => e.stopPropagation()}>
+        {/* Center: Canvas (Dot Matrix Background) */}
+        <div 
+            className="flex-1 p-8 overflow-y-auto flex flex-col items-center" 
+            style={{ backgroundImage: 'radial-gradient(#bae6fd 1px, transparent 1px)', backgroundSize: '24px 24px' }}
+            onClick={() => setSelectedId(null)}
+        >
+            <div className="w-full max-w-2xl bg-white min-h-[calc(100vh-8rem)] rounded-xl shadow-lg border border-slate-200 flex flex-col relative overflow-hidden transition-all" onClick={(e) => e.stopPropagation()}>
                 {/* Canvas Header */}
-                <div className="h-16 bg-indigo-600 rounded-t-xl flex items-center px-8 shadow-sm">
-                    <h1 className="text-white text-lg font-bold">新表單設計</h1>
+                <div className="h-16 bg-white border-b border-slate-100 flex items-center px-8">
+                    <div className="flex-1">
+                        <h1 className="text-slate-900 text-lg font-bold tracking-tight">新表單設計</h1>
+                        <p className="text-xs text-slate-400">上次儲存: 剛剛</p>
+                    </div>
                 </div>
 
                 {/* Form Body */}
-                <div className="flex-1 p-8 space-y-2">
+                <div className="flex-1 p-8 space-y-4">
                     {elements.length === 0 ? (
-                        <div className="h-64 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 m-4">
+                        <div className="h-64 flex flex-col items-center justify-center text-slate-300 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50 m-4">
                             <MousePointer2 size={48} className="mb-4 opacity-50" />
-                            <p className="text-sm font-medium">從左側點擊元件開始設計表單</p>
+                            <p className="text-sm font-bold text-slate-400">從左側點擊元件開始設計表單</p>
                         </div>
                     ) : (
-                        elements.map((el) => (
-                            <div 
-                                key={el.id}
-                                onClick={(e) => { e.stopPropagation(); setSelectedId(el.id); }}
-                                className={`group relative p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                                    selectedId === el.id 
-                                    ? 'border-indigo-500 bg-indigo-50/30 ring-4 ring-indigo-500/10' 
-                                    : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
-                                }`}
-                            >
-                                {/* Form Element Render */}
-                                <div className="pointer-events-none"> {/* Prevent input interaction while designing */}
-                                    {el.type === 'section' ? (
-                                        <div className="border-b-2 border-slate-800 pb-2 mt-4 mb-2">
-                                            <h3 className="text-lg font-bold text-slate-800">{el.label}</h3>
-                                            {el.description && <p className="text-sm text-slate-500 font-normal mt-1">{el.description}</p>}
+                        elements.map((el) => {
+                            const isBound = !!el.apiBinding?.apiObjectId;
+                            return (
+                                <div 
+                                    key={el.id}
+                                    onClick={(e) => { e.stopPropagation(); setSelectedId(el.id); }}
+                                    className={`group relative p-5 rounded-xl border-2 transition-all cursor-pointer ${
+                                        selectedId === el.id 
+                                        ? 'border-sky-500 bg-sky-50/20 shadow-md ring-4 ring-sky-500/10' 
+                                        : 'border-transparent hover:border-slate-200 hover:bg-slate-50'
+                                    } ${isBound ? 'bg-cyan-50/20' : ''}`}
+                                >
+                                    {/* API Binding Visual Indicator - Use Cyan/Teal */}
+                                    {isBound && (
+                                        <div className="absolute top-0 right-0 p-0 overflow-hidden">
+                                            <div className="bg-cyan-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-xl shadow-sm flex items-center gap-1">
+                                                <Link2 size={10} /> API 綁定
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <div className={el.width === 'half' ? 'w-1/2' : el.width === 'third' ? 'w-1/3' : 'w-full'}>
-                                            <label className="block text-sm font-bold text-slate-700 mb-1.5 flex justify-between">
-                                                <span>{el.label} {el.required && <span className="text-red-500">*</span>}</span>
-                                                {el.apiBinding?.apiObjectId && (
-                                                    <span className="text-[10px] text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded flex items-center gap-1 border border-indigo-100">
-                                                        <Link2 size={10} /> API
-                                                    </span>
+                                    )}
+
+                                    {/* Form Element Render */}
+                                    <div className="pointer-events-none"> 
+                                        {el.type === 'section' ? (
+                                            <div className="border-b-2 border-slate-800 pb-2 mt-4 mb-2">
+                                                <h3 className="text-lg font-bold text-slate-900">{el.label}</h3>
+                                                {el.description && <p className="text-sm text-slate-500 font-normal mt-1">{el.description}</p>}
+                                            </div>
+                                        ) : (
+                                            <div className={el.width === 'half' ? 'w-1/2' : el.width === 'third' ? 'w-1/3' : 'w-full'}>
+                                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center justify-between">
+                                                    <span>{el.label} {el.required && <span className="text-red-500">*</span>}</span>
+                                                </label>
+                                                
+                                                {/* Input Preview */}
+                                                {el.type === 'text' && (
+                                                    <div className="relative">
+                                                        <input type="text" className={inputClass} placeholder={el.placeholder} disabled />
+                                                        {isBound && <div className="absolute right-3 top-2.5 text-cyan-500"><Plug size={14} /></div>}
+                                                    </div>
                                                 )}
-                                            </label>
-                                            
-                                            {/* Input Preview */}
-                                            {el.type === 'text' && <input type="text" className={inputClass} placeholder={el.placeholder} disabled />}
-                                            {el.type === 'number' && <input type="number" className={inputClass} placeholder={el.placeholder} disabled />}
-                                            {el.type === 'date' && <input type="date" className={inputClass} disabled />}
-                                            {el.type === 'textarea' && <textarea className={inputClass + " h-24 resize-none"} placeholder={el.placeholder} disabled />}
-                                            {el.type === 'select' && (
-                                                <select className={inputClass} disabled>
-                                                    <option>請選擇...</option>
-                                                    {el.apiBinding?.apiObjectId ? <option>(API 資料選項)</option> : el.options?.map((opt, i) => <option key={i}>{opt.label}</option>)}
-                                                </select>
-                                            )}
-                                            {(el.type === 'radio' || el.type === 'checkbox') && (
-                                                <div className="space-y-2">
-                                                    {el.apiBinding?.apiObjectId ? (
-                                                        <div className="text-xs text-slate-400 italic pl-1 flex items-center gap-2">
-                                                            <div className="w-4 h-4 rounded-full border border-slate-300"></div>
-                                                            API 動態選項...
-                                                        </div>
-                                                    ) : (
-                                                        el.options?.map((opt, i) => (
-                                                            <label key={i} className="flex items-center gap-2 text-sm text-slate-600">
-                                                                <input type={el.type} disabled className="text-indigo-600 focus:ring-indigo-500" />
-                                                                {opt.label}
-                                                            </label>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            )}
-                                            
-                                            {el.description && (
-                                                <p className="text-xs text-slate-500 mt-1.5">{el.description}</p>
-                                            )}
+                                                {el.type === 'number' && <input type="number" className={inputClass} placeholder={el.placeholder} disabled />}
+                                                {el.type === 'date' && <input type="date" className={inputClass} disabled />}
+                                                {el.type === 'textarea' && <textarea className={inputClass + " h-24 resize-none"} placeholder={el.placeholder} disabled />}
+                                                {el.type === 'select' && (
+                                                    <div className="relative">
+                                                        <select className={`${inputClass} ${isBound ? 'bg-cyan-50 border-cyan-200 text-cyan-800 font-medium' : ''}`} disabled>
+                                                            <option>請選擇...</option>
+                                                            {isBound ? <option>⚡ (API 動態資料)</option> : el.options?.map((opt, i) => <option key={i}>{opt.label}</option>)}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                                {(el.type === 'radio' || el.type === 'checkbox') && (
+                                                    <div className="space-y-2">
+                                                        {isBound ? (
+                                                            <div className="p-3 bg-cyan-50 border border-cyan-200 border-dashed rounded-lg text-xs text-cyan-700 font-medium flex items-center gap-2">
+                                                                <List size={14} />
+                                                                此區塊選項將由 API 動態產生
+                                                            </div>
+                                                        ) : (
+                                                            el.options?.map((opt, i) => (
+                                                                <label key={i} className="flex items-center gap-2 text-sm text-slate-600">
+                                                                    <input type={el.type} disabled className="text-slate-400 focus:ring-slate-400" />
+                                                                    {opt.label}
+                                                                </label>
+                                                            ))
+                                                        )}
+                                                    </div>
+                                                )}
+                                                
+                                                {el.description && (
+                                                    <p className="text-xs text-slate-500 mt-1.5">{el.description}</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Actions (Show on hover or select) */}
+                                    {(selectedId === el.id) && (
+                                        <div className="absolute right-2 -top-3 flex gap-1 bg-white shadow-md border border-slate-200 rounded-lg p-1 animate-in fade-in duration-200 z-10">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); duplicateElement(el.id); }}
+                                                className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-sky-600" title="複製"
+                                            >
+                                                <Copy size={14} />
+                                            </button>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); deleteElement(el.id); }}
+                                                className="p-1.5 hover:bg-red-50 rounded text-slate-500 hover:text-red-600" title="刪除"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     )}
                                 </div>
-
-                                {/* Actions (Show on hover or select) */}
-                                {(selectedId === el.id) && (
-                                    <div className="absolute right-2 top-2 flex gap-1 bg-white shadow-sm border border-slate-200 rounded-lg p-1 animate-in fade-in duration-200 z-10">
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); duplicateElement(el.id); }}
-                                            className="p-1.5 hover:bg-slate-100 rounded text-slate-500 hover:text-indigo-600" title="複製"
-                                        >
-                                            <Copy size={14} />
-                                        </button>
-                                        <button 
-                                            onClick={(e) => { e.stopPropagation(); deleteElement(el.id); }}
-                                            className="p-1.5 hover:bg-red-50 rounded text-slate-500 hover:text-red-600" title="刪除"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
@@ -278,23 +299,23 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
 
         {/* Right: Property Panel */}
         <div className="w-80 bg-white border-l border-slate-200 flex flex-col z-10 shadow-sm transition-all">
-            <div className="p-4 border-b border-slate-100">
+            <div className="p-4 border-b border-slate-100 bg-white">
                 <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                     <Settings2 size={16} className="text-slate-500" />
                     屬性設定 (Properties)
                 </h3>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-5">
+            <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
                 {selectedElement ? (
                     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                        <div className="flex items-center gap-2 mb-4 pb-4 border-b border-slate-100">
-                            <div className="p-2 bg-slate-100 rounded-lg text-slate-600">
-                                {getIcon(selectedElement.type)}
+                        <div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-100">
+                            <div className="p-3 bg-slate-100 rounded-xl text-slate-600 border border-slate-200">
+                                {getIcon(selectedElement.type, 20)}
                             </div>
                             <div>
                                 <div className="text-sm font-bold text-slate-800">{getDefaultLabel(selectedElement.type)}</div>
-                                <div className="text-xs text-slate-400 font-mono">{selectedElement.id}</div>
+                                <div className="text-[10px] text-slate-400 font-mono mt-0.5">{selectedElement.id}</div>
                             </div>
                         </div>
 
@@ -328,9 +349,9 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                                         id="req_chk"
                                         checked={selectedElement.required}
                                         onChange={(e) => updateElement(selectedElement.id, { required: e.target.checked })}
-                                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 h-4 w-4"
+                                        className="rounded border-slate-300 text-sky-500 focus:ring-sky-500 h-4 w-4"
                                     />
-                                    <label htmlFor="req_chk" className="text-sm font-medium text-slate-700 cursor-pointer select-none">設為必填欄位 (Required)</label>
+                                    <label htmlFor="req_chk" className="text-sm font-bold text-slate-700 cursor-pointer select-none">設為必填欄位 (Required)</label>
                                 </div>
                                 
                                 <div className="grid grid-cols-3 gap-2 mt-4">
@@ -339,9 +360,9 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                                         <button
                                             key={w}
                                             onClick={() => updateElement(selectedElement.id, { width: w })}
-                                            className={`text-xs py-1.5 px-2 rounded border text-center ${
+                                            className={`text-xs py-2 px-2 rounded-lg border text-center font-medium transition-all ${
                                                 selectedElement.width === w 
-                                                ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' 
+                                                ? 'bg-sky-500 border-sky-500 text-white shadow-sm' 
                                                 : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                                             }`}
                                         >
@@ -373,15 +394,15 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                             </>
                         )}
 
-                        {/* --- Data Binding Section (New) --- */}
+                        {/* --- Data Binding Section (Updated) --- */}
                         {(isListType(selectedElement.type) || isValueType(selectedElement.type)) && (
-                            <div className="pt-4 border-t border-slate-100 mt-6 bg-slate-50 -mx-5 px-5 pb-5">
-                                <div className="flex items-center gap-2 mb-3 pt-3">
-                                    <Link2 size={16} className="text-indigo-600" />
-                                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">資料來源綁定 (Data Binding)</label>
+                            <div className="pt-6 border-t border-slate-100 mt-6 bg-slate-50/50 -mx-5 px-5 pb-5 rounded-b-xl">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="bg-cyan-100 p-1.5 rounded text-cyan-600"><Link2 size={14} /></div>
+                                    <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">API 資料綁定</label>
                                 </div>
                                 
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <div>
                                         <label className={labelClass}>API 物件來源</label>
                                         <select 
@@ -402,7 +423,7 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                                         if (!selectedApi) return null;
 
                                         return (
-                                            <div className="space-y-3 pl-2 border-l-2 border-indigo-200">
+                                            <div className="space-y-4 pl-3 border-l-2 border-cyan-200">
                                                 {isListType(selectedElement.type) ? (
                                                     <>
                                                         <div>
@@ -412,11 +433,14 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                                                                 onChange={(e) => handleBindingChange('valueMappingId', e.target.value)}
                                                                 className={inputClass}
                                                             >
-                                                                <option value="">-- 選擇對應 --</option>
+                                                                <option value="">-- 選擇欄位 --</option>
                                                                 {selectedApi.mappings.map(m => (
-                                                                    <option key={m.id} value={m.id}>{m.sourcePath} ({m.targetProperty})</option>
+                                                                    <option key={m.id} value={m.id}>
+                                                                        {m.parameter ? `${m.parameter} (${m.description || m.sourcePath})` : (m.description || m.sourcePath)}
+                                                                    </option>
                                                                 ))}
                                                             </select>
+                                                            <p className="text-[10px] text-slate-400 mt-1">實際儲存到資料庫的值。</p>
                                                         </div>
                                                         <div>
                                                             <label className={labelClass}>顯示文字欄位 (Label Field)</label>
@@ -425,31 +449,35 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                                                                 onChange={(e) => handleBindingChange('labelMappingId', e.target.value)}
                                                                 className={inputClass}
                                                             >
-                                                                <option value="">-- 選擇對應 --</option>
+                                                                <option value="">-- 選擇欄位 --</option>
                                                                 {selectedApi.mappings.map(m => (
-                                                                    <option key={m.id} value={m.id}>{m.sourcePath} ({m.targetProperty})</option>
+                                                                    <option key={m.id} value={m.id}>
+                                                                         {m.parameter ? `${m.parameter} (${m.description || m.sourcePath})` : (m.description || m.sourcePath)}
+                                                                    </option>
                                                                 ))}
                                                             </select>
-                                                        </div>
-                                                        <div className="text-[10px] text-slate-500 bg-blue-50 p-2 rounded border border-blue-100 flex gap-2">
-                                                            <Info size={14} className="shrink-0 text-blue-500" />
-                                                            設定後，手動選項將被 API 回傳的列表覆蓋。
+                                                            <p className="text-[10px] text-slate-400 mt-1">使用者看到的選項文字。</p>
                                                         </div>
                                                     </>
                                                 ) : (
                                                     <div>
-                                                        <label className={labelClass}>預設值欄位 (Fill Value)</label>
+                                                        <label className={labelClass}>自動填入來源 (Source Field)</label>
                                                         <select 
                                                             value={selectedElement.apiBinding?.fillMappingId || ''}
                                                             onChange={(e) => handleBindingChange('fillMappingId', e.target.value)}
                                                             className={inputClass}
                                                         >
-                                                            <option value="">-- 選擇對應 --</option>
+                                                            <option value="">-- 選擇欄位 --</option>
                                                             {selectedApi.mappings.map(m => (
-                                                                <option key={m.id} value={m.id}>{m.sourcePath} ({m.formatter || 'raw'})</option>
+                                                                <option key={m.id} value={m.id}>
+                                                                    {m.parameter ? `[${m.parameter}] ` : ''}{m.description || m.sourcePath}
+                                                                    {m.formatter && m.formatter !== 'none' ? ` (${m.formatter})` : ''}
+                                                                </option>
                                                             ))}
                                                         </select>
-                                                        <p className="text-[10px] text-slate-400 mt-1">表單載入時將自動填入此欄位的值。</p>
+                                                        <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                                                            當此 API 物件被觸發時，此欄位會自動填入對應的資料。
+                                                        </p>
                                                     </div>
                                                 )}
                                             </div>
@@ -466,7 +494,7 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                                     <label className={labelClass + " mb-0"}>手動選項設定</label>
                                     <button 
                                         onClick={addOption}
-                                        className="text-[10px] flex items-center gap-1 bg-indigo-50 text-indigo-600 px-2 py-1 rounded hover:bg-indigo-100 font-bold transition-colors"
+                                        className="text-[10px] flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-1 rounded hover:bg-slate-200 font-bold transition-colors"
                                     >
                                         <Plus size={12} /> 新增
                                     </button>
@@ -479,14 +507,14 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                                                 type="text"
                                                 value={opt.label}
                                                 onChange={(e) => handleOptionChange(idx, 'label', e.target.value)}
-                                                className="flex-1 bg-white border border-slate-300 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 placeholder-slate-400"
+                                                className="flex-1 bg-white border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-sky-500 focus:border-sky-500 placeholder-slate-400"
                                                 placeholder="顯示文字"
                                             />
                                             <input 
                                                 type="text"
                                                 value={opt.value}
                                                 onChange={(e) => handleOptionChange(idx, 'value', e.target.value)}
-                                                className="w-20 bg-slate-50 border border-slate-300 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-slate-600 placeholder-slate-400"
+                                                className="w-20 bg-slate-50 border border-slate-200 rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-sky-500 focus:border-sky-500 font-mono text-slate-600 placeholder-slate-400"
                                                 placeholder="值"
                                             />
                                             <button 
@@ -503,8 +531,8 @@ export const FormDesigner: React.FC<Props> = ({ apiObjects = [] }) => {
                     </div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center">
-                        <Settings2 size={40} className="mb-4 opacity-20" />
-                        <p className="text-sm font-medium">尚未選取任何元件</p>
+                        <Settings2 size={48} className="mb-4 text-slate-200" />
+                        <p className="text-sm font-bold text-slate-500">尚未選取任何元件</p>
                         <p className="text-xs mt-2 opacity-60">點擊中間畫布上的欄位<br/>以編輯屬性</p>
                     </div>
                 )}

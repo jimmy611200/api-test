@@ -1,7 +1,7 @@
 
 export type Protocol = 'http' | 'https';
 export type AuthType = 'none' | 'basic' | 'api_key' | 'custom_token';
-export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+export type Method = 'GET' | 'POST';
 
 export interface KeyValue {
   id: string;
@@ -30,20 +30,31 @@ export type FormatterType = 'none' | 'date_slash' | 'date_dash' | 'currency' | '
 
 export interface FieldMapping {
   id: string;
-  sourcePath: string; // e.g., PayeeCode
-  targetProperty: 'value' | 'label' | 'extra';
-  targetExtraName?: string; // If targetProperty is extra
+  parameter?: string; // Alias/Variable Name for the Form (e.g., "VendorName")
+  sourcePath: string; // JSON Key from API Response (e.g., "PayeeName")
+  description?: string; // Human readable label
   formatter?: FormatterType; // Data transformation
+}
+
+export interface ApiCategory {
+  id: string;
+  name: string;
+  allowedDepts: string[]; // Mock List of Department IDs/Names
+  allowedUsers: string[]; // Mock List of User IDs/Names
 }
 
 export interface ApiObject {
   id: string;
   dataSourceId: string; // Link to DataSource
+  categoryId?: string; // Link to ApiCategory
   name: string; // e.g., 供應商主檔
   description?: string;
   method: Method;
   path: string; // e.g., /API
-  requestBodyTemplate?: string; // JSON string with placeholders like ${SessionID}
+  
+  requestBodyTemplate?: string; // JSON string with placeholders like ${SessionID} or ${DeptID}
+  
+  // Output
   responseRootPath?: string; // e.g., PayeeList
   mappings: FieldMapping[];
 }

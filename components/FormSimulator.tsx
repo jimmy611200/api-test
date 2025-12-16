@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ApiObject, DataSource, FormatterType } from '../types';
-import { Play, LayoutTemplate, ArrowRight, Loader2, Database, AlertCircle, Code2 } from 'lucide-react';
+import { Play, LayoutTemplate, ArrowRight, Loader2, Code2, List, Type, CheckSquare, Calendar, RefreshCw, MousePointerClick, CircleDot, Database, ArrowDownToLine, ScanLine } from 'lucide-react';
 
 interface Props {
   apiObject: ApiObject;
@@ -9,24 +9,17 @@ interface Props {
 }
 
 const formatValue = (value: any, type?: FormatterType): string => {
-    if (!value) return '';
+    if (value === undefined || value === null) return '';
     const strVal = String(value);
     
     switch (type) {
-        case 'date_slash': // 2023-01-01 -> 2023/01/01
-            return strVal.replace(/-/g, '/').split('T')[0];
-        case 'date_dash': // 2023/01/01 -> 2023-01-01
-            return strVal.replace(/\//g, '-').split('T')[0];
-        case 'currency': // 1000 -> $1,000
-            return !isNaN(Number(strVal)) ? `$${Number(strVal).toLocaleString()}` : strVal;
-        case 'boolean_yn': // true/1 -> Y, false/0 -> N
-            return (strVal === 'true' || strVal === '1' || strVal === 'Y') ? 'Y' : 'N';
-        case 'uppercase':
-            return strVal.toUpperCase();
-        case 'lowercase':
-            return strVal.toLowerCase();
-        default:
-            return strVal;
+        case 'date_slash': return strVal.replace(/-/g, '/').split('T')[0];
+        case 'date_dash': return strVal.replace(/\//g, '-').split('T')[0];
+        case 'currency': return !isNaN(Number(strVal)) ? `$${Number(strVal).toLocaleString()}` : strVal;
+        case 'boolean_yn': return (strVal === 'true' || strVal === '1' || strVal === 'Y') ? 'Y' : 'N';
+        case 'uppercase': return strVal.toUpperCase();
+        case 'lowercase': return strVal.toLowerCase();
+        default: return strVal;
     }
 };
 
@@ -35,262 +28,387 @@ const getValueByPath = (obj: any, path: string) => {
     return path.split('.').reduce((acc, part) => acc && acc[part], obj);
 };
 
-export const FormSimulator: React.FC<Props> = ({ apiObject, dataSource }) => {
-  const [params, setParams] = useState<Record<string, string>>({});
+const setDeepValue = (obj: any, path: string, value: any) => {
+    if (!path) return;
+    const parts = path.split('.');
+    let current = obj;
+    for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!current[part]) current[part] = {};
+        current = current[part];
+    }
+    current[parts[parts.length - 1]] = value;
+};
+
+type PreviewType = 'select' | 'radio' | 'checkbox' | 'text' | 'date';
+
+export const FormSimulator: React.FC<Props> = ({ apiObject }) => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [responseData, setResponseData] = useState<any[]>([]);
-  const [selectedValue, setSelectedValue] = useState<string>('');
+  const [rawResponse, setRawResponse] = useState<any>(null);
+  
+  // Selection States
+  const [selectedMappingId, setSelectedMappingId] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<PreviewType>('select');
 
-  // Extract variables from request template (e.g. ${DeptID})
-  const variables = useMemo(() => {
-    const matches = apiObject.requestBodyTemplate?.match(/\${(.*?)}/g);
-    if (!matches) return [];
-    return Array.from(new Set(matches.map(m => m.replace(/[${}]/g, ''))))
-      .filter(v => v !== 'SessionID'); 
-  }, [apiObject.requestBodyTemplate]);
+  // Auto-select first mapping when loaded
+  useEffect(() => {
+      if (apiObject.mappings.length > 0 && !selectedMappingId) {
+          setSelectedMappingId(apiObject.mappings[0].id);
+      }
+  }, [apiObject.mappings]);
 
-  const handleParamChange = (key: string, val: string) => {
-    setParams(prev => ({ ...prev, [key]: val }));
-  };
+  const activeMapping = apiObject.mappings.find(m => m.id === selectedMappingId);
 
-  const simulateCall = () => {
-    setStatus('loading');
-    setResponseData([]);
-    setSelectedValue('');
+  const generateMockData = () => {
+    const mockCount = 5; // Generate 5 items for list simulation
+    const mocks = [];
 
-    // Mock API Call
-    setTimeout(() => {
-        // Generate mock data based on mappings
-        const mockItem1: any = {};
-        const mockItem2: any = {};
-        const mockItem3: any = {};
-
+    for (let i = 0; i < mockCount; i++) {
+        const row: any = {};
+        
         apiObject.mappings.forEach(m => {
-            const key = m.sourcePath.split('.').pop() || 'field';
-            if (key.includes('Date')) {
-                mockItem1[key] = "2023-10-01";
-                mockItem2[key] = "2023-11-15";
-                mockItem3[key] = "2023-12-20";
-            } else if (key.includes('Amount') || key.includes('Price')) {
-                mockItem1[key] = 5000;
-                mockItem2[key] = 12500;
-                mockItem3[key] = 300;
-            } else if (key.includes('Name')) {
-                mockItem1[key] = "測試項目 A";
-                mockItem2[key] = "測試項目 B";
-                mockItem3[key] = "測試項目 C";
-            } else if (key.includes('Code') || key.includes('ID')) {
-                mockItem1[key] = "A001";
-                mockItem2[key] = "B002";
-                mockItem3[key] = "C003";
+            if (!m.sourcePath) return;
+
+            let val: any = null;
+            const suffix = ` ${i + 1}`; 
+
+            const fieldName = m.sourcePath.toLowerCase();
+            
+            if (m.formatter?.includes('date') || fieldName.includes('date') || fieldName.includes('time')) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                val = d.toISOString().split('T')[0];
+            } else if (m.formatter === 'currency' || m.formatter === 'number' || fieldName.includes('amount') || fieldName.includes('price')) {
+                val = (i + 1) * 1000 + 500;
+            } else if (m.formatter === 'boolean_yn' || fieldName.startsWith('is') || fieldName.startsWith('has')) {
+                val = i % 2 === 0 ? 'Y' : 'N';
+            } else if (fieldName.includes('email')) {
+                val = `user${i+1}@example.com`;
+            } else if (fieldName.includes('id') || fieldName.includes('code') || fieldName.includes('no')) {
+                val = `CODE-${1000 + i}`;
             } else {
-                mockItem1[key] = "Demo Data 1";
-                mockItem2[key] = "Demo Data 2";
-                mockItem3[key] = "Demo Data 3";
+                val = `${m.description || m.parameter || m.sourcePath}${suffix}`;
             }
+
+            setDeepValue(row, m.sourcePath, val);
         });
 
-        setResponseData([mockItem1, mockItem2, mockItem3]);
-        setStatus('success');
-    }, 1000);
+        if (apiObject.mappings.length === 0) {
+            row['id'] = i + 1;
+            row['value'] = `Sample Data ${i + 1}`;
+        }
+        mocks.push(row);
+    }
+    return mocks;
   };
 
-  const valueMapping = apiObject.mappings.find(m => m.targetProperty === 'value');
-  const labelMapping = apiObject.mappings.find(m => m.targetProperty === 'label');
-  const extraMappings = apiObject.mappings.filter(m => m.targetProperty === 'extra');
+  const executeSimulation = () => {
+    setStatus('loading');
+    setResponseData([]);
+    setRawResponse(null);
 
-  const selectedItem = useMemo(() => {
-    if (!valueMapping) return undefined;
-    return responseData.find(item => String(getValueByPath(item, valueMapping.sourcePath)) === selectedValue);
-  }, [selectedValue, responseData, valueMapping]);
+    setTimeout(() => {
+        const mocks = generateMockData();
+        setResponseData(mocks);
+        
+        let raw: any = mocks;
+        if (apiObject.responseRootPath) {
+            const rootParts = apiObject.responseRootPath.split('.');
+            // Reduce right to build the nested object: Data -> PayeeList -> [Array]
+            raw = rootParts.reduceRight((acc, part) => ({ [part]: acc }), mocks);
+        }
+        
+        setRawResponse({ 
+            Status: "Success",
+            StatusCode: 200,
+            Data: raw,
+            Message: "Simulation Completed"
+        });
+        
+        setStatus('success');
+    }, 500);
+  };
+
+  // Helper to get formatted values for the active mapping
+  const getPreviewValues = () => {
+      if (!activeMapping) return [];
+      return responseData.map(item => {
+          const raw = getValueByPath(item, activeMapping.sourcePath);
+          return formatValue(raw, activeMapping.formatter);
+      });
+  };
+
+  const previewValues = getPreviewValues();
+  const isCollectionMode = ['select', 'radio', 'checkbox'].includes(previewType);
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    // Replaced h-full with min-h-full to allow scrolling if content is tall
+    <div className="flex flex-col min-h-full bg-slate-50">
         
-        {/* Main Simulation Area */}
-        <div className="flex-1 overflow-hidden">
-            <div className="h-full grid grid-cols-12 divide-x divide-slate-200">
-                
-                {/* Left: Params Input */}
-                <div className="col-span-4 bg-white p-6 flex flex-col overflow-y-auto">
-                    <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-                        <div className="bg-blue-100 text-blue-600 p-2 rounded-lg">
-                            <Database size={18} />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-slate-800">來源參數模擬</h3>
-                            <p className="text-xs text-slate-500">輸入表單欄位值以模擬 API 請求</p>
-                        </div>
+        {/* TOP SECTION: Execution & JSON */}
+        {/* Reduced height to 200px to give more room to the bottom section */}
+        <div className="h-[200px] bg-slate-900 flex flex-col shrink-0 border-b border-slate-800 shadow-md z-20">
+            {/* Header */}
+            <div className="h-12 px-4 flex items-center justify-between bg-slate-950 border-b border-white/10">
+                 <div className="flex items-center gap-3">
+                    <div className="text-sky-400 p-1.5 bg-sky-500/10 rounded-lg border border-sky-500/20">
+                         <Code2 size={18} />
                     </div>
-                    
-                    <div className="space-y-5 flex-1">
-                        {variables.length > 0 ? (
-                            variables.map(v => (
-                                <div key={v}>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2 tracking-wide">
-                                        表單欄位: {v}
-                                    </label>
-                                    <input 
-                                        type="text"
-                                        value={params[v] || ''}
-                                        onChange={(e) => handleParamChange(v, e.target.value)}
-                                        className="w-full bg-white border border-slate-200 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all shadow-sm"
-                                        placeholder={`輸入測試值...`}
-                                    />
-                                </div>
-                            ))
-                        ) : (
-                            <div className="text-sm text-slate-400 italic py-4 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                                此 API 物件無動態參數
-                            </div>
-                        )}
-                    </div>
-                    
+                    <h3 className="font-bold text-slate-200 text-sm tracking-wide">模擬資料生成 (Data Simulation)</h3>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    {status === 'success' && (
+                        <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                            HTTP 200 OK • {responseData.length} Items
+                        </span>
+                    )}
                     <button 
-                        onClick={simulateCall}
+                        onClick={executeSimulation}
                         disabled={status === 'loading'}
-                        className="w-full mt-6 flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-3 rounded-xl hover:bg-slate-700 transition-all shadow-md hover:shadow-lg disabled:opacity-70 disabled:shadow-none active:scale-[0.98]"
+                        className="flex items-center gap-2 bg-sky-500 text-white px-4 py-1.5 rounded-lg hover:bg-sky-400 transition-all shadow active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-bold uppercase tracking-wider"
                     >
-                        {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
-                        {status === 'loading' ? '請求處理中...' : '執行模擬 (Simulate)'}
+                        {status === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
+                        {status === 'loading' ? 'Generating...' : 'Execute API'}
                     </button>
                 </div>
+            </div>
 
-                {/* Right: Form Preview */}
-                <div className="col-span-8 bg-slate-50/50 p-8 flex flex-col items-center justify-center relative">
-                    <div className="absolute top-6 left-8 flex items-center gap-2 text-slate-800">
-                        <div className="bg-emerald-100 text-emerald-600 p-2 rounded-lg">
-                            <LayoutTemplate size={18} />
-                        </div>
-                        <div>
-                            <h3 className="font-bold">表單互動預覽</h3>
-                            <p className="text-xs text-slate-500">預覽資料回填效果</p>
-                        </div>
-                    </div>
-
-                    <div className="w-full max-w-lg">
-                        {status === 'idle' && (
-                            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
-                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
-                                    <ArrowRight size={32} />
-                                </div>
-                                <p className="text-slate-500 font-medium">請先於左側輸入參數並執行模擬</p>
-                            </div>
-                        )}
-
-                        {status === 'loading' && (
-                            <div className="text-center py-20">
-                                <Loader2 size={40} className="mb-4 animate-spin text-blue-600 mx-auto opacity-80" />
-                                <p className="text-slate-500 font-medium">正在與 API 進行資料交換...</p>
-                            </div>
-                        )}
-
-                        {status === 'success' && (
-                            <div className="bg-white shadow-xl shadow-slate-200/50 border border-slate-200 rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-                                <div className="bg-slate-50 px-6 py-3 border-b border-slate-100 flex justify-between items-center">
-                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Form Preview</span>
-                                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">API Connected</span>
-                                </div>
-                                <div className="p-8 space-y-8">
-                                    {/* Main Selector */}
-                                    <div>
-                                        <label className="block text-sm font-bold text-slate-700 mb-2">
-                                            {apiObject.name} <span className="text-red-500">*</span>
-                                        </label>
-                                        <select 
-                                            className="w-full bg-white border border-slate-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all cursor-pointer hover:border-blue-300"
-                                            value={selectedValue}
-                                            onChange={(e) => setSelectedValue(e.target.value)}
-                                        >
-                                            <option value="">-- 請選擇 --</option>
-                                            {responseData.map((item, i) => {
-                                                const val = valueMapping ? getValueByPath(item, valueMapping.sourcePath) : JSON.stringify(item);
-                                                const label = labelMapping ? getValueByPath(item, labelMapping.sourcePath) : 'Label Not Set';
-                                                const formattedLabel = formatValue(label, labelMapping?.formatter);
-                                                return (
-                                                    <option key={i} value={val}>{formattedLabel}</option>
-                                                );
-                                            })}
-                                        </select>
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">儲存值 (Value):</span>
-                                            <code className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono border border-slate-200">
-                                                {selectedValue || 'null'}
-                                            </code>
-                                        </div>
-                                    </div>
-
-                                    {/* Extra Fields */}
-                                    {extraMappings.length > 0 && (
-                                        <div className="pt-6 border-t border-slate-100">
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <span className="h-px flex-1 bg-slate-200"></span>
-                                                <span className="text-xs font-medium text-slate-400">連動欄位自動回填</span>
-                                                <span className="h-px flex-1 bg-slate-200"></span>
-                                            </div>
-                                            
-                                            <div className="space-y-4">
-                                                {extraMappings.map(m => {
-                                                    const rawValue = selectedItem ? getValueByPath(selectedItem, m.sourcePath) : '';
-                                                    const finalValue = formatValue(rawValue, m.formatter);
-                                                    
-                                                    return (
-                                                        <div key={m.id} className="grid grid-cols-12 gap-4 items-center group">
-                                                            <label className="col-span-4 text-sm font-medium text-slate-500 text-right group-hover:text-blue-600 transition-colors">
-                                                                {m.targetExtraName || '未命名欄位'}
-                                                            </label>
-                                                            <div className="col-span-8 relative">
-                                                                <input 
-                                                                    type="text" 
-                                                                    readOnly
-                                                                    value={finalValue}
-                                                                    className="w-full bg-slate-50 text-slate-700 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-0 cursor-not-allowed font-medium"
-                                                                    placeholder="系統自動帶入..."
-                                                                />
-                                                                {m.formatter && m.formatter !== 'none' && (
-                                                                    <div className="absolute right-2 top-2 text-[10px] text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 font-medium">
-                                                                        {m.formatter}
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {!selectedItem && extraMappings.length > 0 && (
-                                        <div className="mt-4 p-3 bg-amber-50 text-amber-700 text-xs rounded-lg border border-amber-100 flex items-center gap-2">
-                                            <AlertCircle size={14} className="shrink-0" />
-                                            請選擇上方項目以查看連動欄位效果
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+            {/* Content: Raw JSON */}
+            <div className="flex-1 overflow-auto p-4 custom-scrollbar bg-slate-900/50 relative">
+                <pre className={`text-xs font-mono leading-relaxed whitespace-pre-wrap ${status === 'error' ? 'text-red-400' : 'text-slate-300'}`}>
+                    {(status === 'success' || status === 'error') && rawResponse 
+                        ? JSON.stringify(rawResponse, null, 2) 
+                        : <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-60">
+                            <RefreshCw size={24} className="mb-2" />
+                            <span className="text-xs">點擊上方按鈕執行模擬</span>
+                          </div>
+                    }
+                </pre>
             </div>
         </div>
 
-        {/* Bottom: Debug Console */}
-        <div className="h-48 bg-slate-900 border-t border-slate-800 flex flex-col">
-            <div className="px-6 py-2 bg-slate-950 border-b border-slate-800 flex justify-between items-center">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                    <Code2 size={14} />
-                    <span>Raw JSON Response</span>
+        {/* BOTTOM SECTION */}
+        {/* Enforced min-h-[600px] to make it tall */}
+        <div className="flex-1 flex min-h-[600px] bg-white">
+            
+            {/* LEFT: Mapping Selection */}
+            <div className="w-72 bg-white border-r border-slate-200 flex flex-col z-10">
+                <div className="p-4 border-b border-slate-100 bg-slate-50/50">
+                    <h3 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                        <List size={14} className="text-sky-600" />
+                        1. 選擇回傳參數 (Mappings)
+                    </h3>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                        點擊下方參數以綁定至預覽元件
+                    </p>
                 </div>
-                {status === 'success' && (
-                    <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
-                        {responseData.length} Records Found
-                    </span>
-                )}
+                
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    {apiObject.mappings.length === 0 ? (
+                         <div className="text-center py-8 text-slate-400 text-xs border border-dashed border-slate-200 rounded-lg">
+                            尚未設定回傳欄位
+                        </div>
+                    ) : (
+                        apiObject.mappings.map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => setSelectedMappingId(m.id)}
+                                className={`w-full text-left p-3 rounded-lg border transition-all relative group ${
+                                    selectedMappingId === m.id 
+                                    ? 'bg-sky-50 border-sky-200 shadow-sm ring-1 ring-sky-500/20' 
+                                    : 'bg-white border-slate-200 hover:border-sky-300 hover:bg-sky-50'
+                                }`}
+                            >
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className={`text-xs font-bold font-mono ${selectedMappingId === m.id ? 'text-sky-700' : 'text-slate-600'}`}>
+                                        {m.parameter || '(無別名)'}
+                                    </span>
+                                    {selectedMappingId === m.id && <div className="w-1.5 h-1.5 rounded-full bg-sky-500"></div>}
+                                </div>
+                                <div className="text-[11px] text-slate-500 truncate" title={m.description || m.sourcePath}>
+                                    {m.description || m.sourcePath}
+                                </div>
+                                {m.formatter && m.formatter !== 'none' && (
+                                    <span className="absolute right-2 bottom-2 text-[9px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                                        {m.formatter}
+                                    </span>
+                                )}
+                            </button>
+                        ))
+                    )}
+                </div>
             </div>
-            <div className="flex-1 overflow-auto p-4 custom-scrollbar">
-                <pre className="text-xs font-mono text-emerald-400 leading-relaxed">
-                    {responseData.length > 0 ? JSON.stringify(responseData, null, 2) : <span className="text-slate-600">// 等待模擬執行...</span>}
-                </pre>
+
+            {/* RIGHT: Form Preview Canvas */}
+            <div className="flex-1 flex flex-col bg-sky-50/20 relative">
+                {/* Toolbar */}
+                <div className="h-12 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0 shadow-sm">
+                    <div className="flex items-center gap-2 text-slate-700 font-bold text-xs uppercase tracking-wider">
+                        <LayoutTemplate size={14} className="text-emerald-600" />
+                        2. 表單元件互動預覽
+                    </div>
+                    
+                    <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                        {[
+                            { id: 'select', icon: List, label: '選單' },
+                            { id: 'radio', icon: CircleDot, label: '單選' },
+                            { id: 'checkbox', icon: CheckSquare, label: '複選' },
+                            { id: 'text', icon: Type, label: '文字' },
+                            { id: 'date', icon: Calendar, label: '日期' },
+                        ].map((btn) => (
+                            <button 
+                                key={btn.id}
+                                onClick={() => setPreviewType(btn.id as PreviewType)}
+                                className={`px-2.5 py-1.5 rounded-md flex items-center gap-1.5 text-xs font-medium transition-all ${
+                                    previewType === btn.id 
+                                    ? 'bg-white text-sky-600 shadow-sm ring-1 ring-slate-200' 
+                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                                }`}
+                            >
+                                <btn.icon size={13} /> <span>{btn.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Canvas */}
+                <div className="flex-1 overflow-y-auto p-10 flex flex-col items-center">
+                    <div className="w-full max-w-lg">
+                        {status !== 'success' ? (
+                            <div className="text-center py-20 opacity-50">
+                                <ArrowRight size={48} className="mx-auto mb-4 text-slate-300" />
+                                <p className="text-slate-500 font-medium">請先執行上方的模擬以產生資料</p>
+                            </div>
+                        ) : !activeMapping ? (
+                             <div className="text-center py-20 opacity-50">
+                                <MousePointerClick size={48} className="mx-auto mb-4 text-slate-300" />
+                                <p className="text-slate-500 font-medium">請從左側選擇一個參數進行預覽</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                
+                                {/* Context Information Card */}
+                                <div className={`p-4 rounded-lg border flex items-start gap-3 ${
+                                    isCollectionMode 
+                                    ? 'bg-sky-50 border-sky-200 text-sky-900' 
+                                    : 'bg-orange-50 border-orange-200 text-orange-900'
+                                }`}>
+                                    <div className="mt-0.5">
+                                        {isCollectionMode ? <Database size={18} /> : <ScanLine size={18} />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="text-sm font-bold mb-1">
+                                            {isCollectionMode ? '情境 A：清單選項來源 (List Source)' : '情境 B：單筆資料回填 (Auto-Fill)'}
+                                        </h4>
+                                        <p className="text-xs opacity-80 leading-relaxed mb-2">
+                                            {isCollectionMode 
+                                                ? '您選擇了集合型元件 (選單/Radio)。系統會讀取 JSON 陣列中的「每一筆」資料來產生選項列表。' 
+                                                : '您選擇了單值型元件 (Text/Date)。系統會模擬「選取特定列」後，擷取該列的欄位值填入。'}
+                                        </p>
+                                        <div className="text-[10px] font-mono bg-white/50 px-2 py-1 rounded inline-block border border-black/5">
+                                            JSON Path: {apiObject.responseRootPath ? `${apiObject.responseRootPath}[*].` : 'Root[*].'}{activeMapping.sourcePath}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-xl ring-4 ring-slate-100 animate-in fade-in zoom-in-95 duration-300">
+                                    <label className="block text-sm font-bold text-slate-800 mb-4 flex justify-between items-center">
+                                        <span>{activeMapping.description || activeMapping.parameter || '預覽欄位'}</span>
+                                        <span className="text-[10px] font-normal text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+                                            {activeMapping.parameter || activeMapping.sourcePath}
+                                        </span>
+                                    </label>
+
+                                    {/* WIDGETS RENDER */}
+                                    <div className="space-y-2">
+                                        {previewType === 'select' && (
+                                            <div className="relative">
+                                                <select className="w-full bg-white border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 shadow-sm appearance-none">
+                                                    <option value="">請選擇...</option>
+                                                    {previewValues.map((val, idx) => (
+                                                        <option key={idx} value={val}>{val}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="absolute right-3 top-3 pointer-events-none text-slate-400">
+                                                    <List size={16} />
+                                                </div>
+                                                <p className="text-xs text-sky-600 mt-2 flex items-center gap-1">
+                                                    <ArrowDownToLine size={12} />
+                                                    已讀取 {previewValues.length} 筆資料作為選項
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {previewType === 'radio' && (
+                                            <div className="space-y-3">
+                                                {previewValues.map((val, idx) => (
+                                                    <label key={idx} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                                                        <input type="radio" name="preview_radio" className="w-4 h-4 text-sky-600 border-slate-300 focus:ring-sky-500" />
+                                                        <span className="text-sm text-slate-700">{val}</span>
+                                                    </label>
+                                                ))}
+                                                <p className="text-xs text-sky-600 mt-2 flex items-center gap-1">
+                                                    <ArrowDownToLine size={12} />
+                                                    已讀取 {previewValues.length} 筆資料作為選項
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {previewType === 'checkbox' && (
+                                            <div className="space-y-3">
+                                                {previewValues.map((val, idx) => (
+                                                    <label key={idx} className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                                                        <input type="checkbox" className="w-4 h-4 text-sky-600 rounded border-slate-300 focus:ring-sky-500" />
+                                                        <span className="text-sm text-slate-700">{val}</span>
+                                                    </label>
+                                                ))}
+                                                <p className="text-xs text-sky-600 mt-2 flex items-center gap-1">
+                                                    <ArrowDownToLine size={12} />
+                                                    已讀取 {previewValues.length} 筆資料作為選項
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {previewType === 'text' && (
+                                            <div>
+                                                <input 
+                                                    type="text" 
+                                                    readOnly 
+                                                    value={previewValues[0] || ''}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 focus:outline-none" 
+                                                />
+                                                <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                                                    <ScanLine size={12} />
+                                                    模擬鎖定第 1 筆資料 (Index 0) 進行回填
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {previewType === 'date' && (
+                                            <div className="relative">
+                                                <input 
+                                                    type="date" 
+                                                    readOnly 
+                                                    value={(() => {
+                                                        const val = previewValues[0];
+                                                        return val && val.match(/^\d{4}-\d{2}-\d{2}$/) ? val : new Date().toISOString().split('T')[0];
+                                                    })()}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 text-sm text-slate-700 focus:outline-none" 
+                                                />
+                                                <p className="text-xs text-orange-600 mt-2 flex items-center gap-1">
+                                                    <ScanLine size={12} />
+                                                    模擬鎖定第 1 筆資料 (Index 0) 進行回填
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
