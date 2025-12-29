@@ -1,7 +1,7 @@
 
 import { DataSource, ApiObject, ApiCategory } from './types';
 
-// FlexSystem Template
+// FlexSystem Template (Generalized)
 export const FLEXSYSTEM_TEMPLATE: Partial<DataSource> = {
   protocol: 'http',
   port: '8033',
@@ -11,8 +11,9 @@ export const FLEXSYSTEM_TEMPLATE: Partial<DataSource> = {
   ],
   authConfig: {
     loginUrl: '/Login',
-    tokenField: 'Session',
-    tokenVariable: 'SessionID',
+    responseVariables: [
+      { id: 'rv_1', jsonPath: 'Session', variableName: 'SessionID' }
+    ],
     extraLoginParams: '{\n  "ClientVersion": "API"\n}',
     username: 'DEMO',
     password: ''
@@ -34,8 +35,9 @@ export const INITIAL_DATA_SOURCES: DataSource[] = [
       username: 'DEMO',
       password: '',
       loginUrl: '/Login',
-      tokenField: 'Session',
-      tokenVariable: 'SessionID',
+      responseVariables: [
+        { id: 'rv_1', jsonPath: 'Session', variableName: 'SessionID' }
+      ],
       extraLoginParams: '{\n  "ClientVersion": "API"\n}'
     }
   },
@@ -82,7 +84,6 @@ export const INITIAL_API_OBJECTS: ApiObject[] = [
   }
 ];
 
-// Mock Organization Structure for Tree Select
 export interface OrgNode {
     id: string;
     name: string;

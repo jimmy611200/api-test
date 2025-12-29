@@ -9,6 +9,12 @@ export interface KeyValue {
   value: string;
 }
 
+export interface ResponseVariableMapping {
+  id: string;
+  jsonPath: string;     // e.g., "Session" or "data.access_token"
+  variableName: string; // e.g., "token" or "SessionID"
+}
+
 export interface AuthConfig {
   // Basic Auth
   username?: string;
@@ -19,10 +25,9 @@ export interface AuthConfig {
   apiKeyValue?: string;
   apiKeyPlacement?: 'header' | 'query';
 
-  // Custom / Token (e.g. FlexSystem)
+  // Custom / Token (Generalizing for multiple vendors)
   loginUrl?: string; 
-  tokenField?: string; // Path to token in login response (e.g., Session)
-  tokenVariable?: string; // Variable name (e.g., SessionID)
+  responseVariables?: ResponseVariableMapping[]; // List of variables to extract from login response
   extraLoginParams?: string; // JSON string
 }
 
@@ -39,23 +44,23 @@ export interface FieldMapping {
 export interface ApiCategory {
   id: string;
   name: string;
-  allowedDepts: string[]; // Mock List of Department IDs/Names
-  allowedUsers: string[]; // Mock List of User IDs/Names
+  allowedDepts: string[]; 
+  allowedUsers: string[]; 
 }
 
 export interface ApiObject {
   id: string;
-  dataSourceId: string; // Link to DataSource
-  categoryId?: string; // Link to ApiCategory
-  name: string; // e.g., 供應商主檔
+  dataSourceId: string;
+  categoryId?: string;
+  name: string;
   description?: string;
   method: Method;
-  path: string; // e.g., /API
+  path: string;
   
-  requestBodyTemplate?: string; // JSON string with placeholders like ${SessionID} or ${DeptID}
+  requestBodyTemplate?: string; 
   
   // Output
-  responseRootPath?: string; // e.g., PayeeList
+  responseRootPath?: string; 
   mappings: FieldMapping[];
 }
 
@@ -67,7 +72,7 @@ export interface DataSource {
   protocol: Protocol;
   authType: AuthType;
   authConfig: AuthConfig;
-  headers: KeyValue[]; // Global headers like Content-Type
+  headers: KeyValue[]; 
 }
 
 // --- Form Designer Types ---
@@ -80,27 +85,21 @@ export interface FormElementOption {
 }
 
 export interface ApiBinding {
-    apiObjectId: string; // Which API to call
-    
-    // For Select/Radio/Checkbox (List Data)
-    valueMappingId?: string; // Which mapping provides the 'value'
-    labelMappingId?: string; // Which mapping provides the 'label'
-
-    // For Text/Number/Date (Single Data Fill)
-    fillMappingId?: string; // Which mapping provides the value to fill
+    apiObjectId: string;
+    valueMappingId?: string;
+    labelMappingId?: string;
+    fillMappingId?: string;
 }
 
 export interface FormElement {
     id: string;
     type: FormElementType;
     label: string;
-    fieldKey: string; // unique key for data binding
+    fieldKey: string;
     placeholder?: string;
     required: boolean;
     description?: string;
-    options?: FormElementOption[]; // For select, radio, checkbox (Manual options)
+    options?: FormElementOption[];
     width?: 'full' | 'half' | 'third';
-    
-    // New: Binding Config
     apiBinding?: ApiBinding;
 }
